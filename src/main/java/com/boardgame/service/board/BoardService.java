@@ -1,40 +1,72 @@
 package com.boardgame.service.board;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import com.boardgame.bo.board.Board;
 import com.boardgame.bo.board.Tile;
+import com.boardgame.bo.board.Token;
 import com.boardgame.dto.Game;
 import com.boardgame.enums.GameObjectTypes;
-import com.boardgame.enums.board.TokenType;
-import com.boardgame.service.GameService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 @Service
 public class BoardService {
 
-	@Autowired
-	private GameService gameService;
+    @Autowired
+    private LevelService levelService;
 
-	@Autowired
-	private LevelService levelService;
+    @Autowired
+    private TokenService tokenService;
 
-	
+    public Game updateTile(Game game, String uuid, int level, Integer x, Integer y, Tile updateTile) {
+        if (StringUtils.isEmpty(uuid) && (x == null && y == null)) {
+            throw new IllegalArgumentException("");
+        }
 
-	public Board getBoard(String name) {
+        Board board = getBoard(game);
 
-		Game game = gameService.getGameByName(name);
+        Tile tile = levelService.getTile(board, uuid, level, x, y);
 
-		game.gameObjects.putIfAbsent(GameObjectTypes.board, new Board());
+        if (updateTile != null) {
+            updateTile.setId(tile.getId());
 
-		Board board = (Board) game.gameObjects.get(GameObjectTypes.board);
+            levelService.setTileByPosition(levelService.getLevel(board, level), x, y, updateTile);
+        }
 
-		Tile tile = levelService.getTile(board, 0, 0, 0);
+        return game;
+    }
 
-		
+    public Board getBoard(Game game) {
+        game.gameObjects.putIfAbsent(GameObjectTypes.board, new Board());
 
-		gameService.save(game);
+        Board board = (Board) game.gameObjects.get(GameObjectTypes.board);
 
-		return board;
-	}
+        return board;
+    }
+
+    public Game updateToken(Game game, String tokenId, int level, Integer x, Integer y, Token updateToken) {
+        Board board = getBoard(game);
+
+        if (tokenId != null) {
+            if (board.getTokens().get(tokenId) == null) {
+                throw new IllegalArgumentException("token identifier");
+            }
+        }
+
+        Tile tile = null;
+        if (x != null && y != null) {
+            tile = levelService.getTileByPosition(board, level, x, y);
+        }
+
+        if (tokenId == null) {
+            tokenId = tokenService.createToken(board, tile, updateToken.getName(), updateToken.getType(), updateToken.getOwner());
+        } else if (tile != null) {
+            tile.getTokenIds().add(tokenId);
+        }
+
+        board.getTokens().put(tokenId, updateToken);
+
+        return game;
+
+    }
 }
